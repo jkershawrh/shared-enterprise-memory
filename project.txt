@@ -1,0 +1,2468 @@
+Act as a principal distributed-systems architect and senior engineer. Design and implement the first vertical slice of a governed shared enterprise memory system using immutable-ledger as its evidence and provenance spine.
+
+REPOSITORY
+
+Work in:
+
+https://github.com/jkershawrh/are-immutable-ledger
+
+PR #8 has been merged. Its V3 proof-envelope hardening is now the baseline.
+
+Before changing code:
+
+1. Read all repository instructions, including AGENTS.md or CLAUDE.md if present.
+2. Fetch origin.
+3. Switch to main.
+4. Fast-forward to origin/main.
+5. Confirm that the working tree is clean.
+6. Create a new branch named:
+
+   feature/shared-enterprise-memory-foundation
+
+Do not modify or reopen PR #8. Do not rewrite migration 006 or change existing V2/V3 hash semantics.
+
+New writes use V3, but historical V2 entries remain supported. Preserve hash_version throughout the memory system. Never assume legacy V2 entries bind writer signature or attestation evidence.
+
+OBJECTIVE
+
+Build the foundation for shared enterprise memory in which:
+
+- Immutable-ledger preserves consequential historical evidence.
+- Governance establishes the official operating position.
+- Projections explain what the history means now.
+- Agents retrieve fast, governed context from projections.
+- Outcomes show what happened after a decision or action.
+- Different human and system perspectives remain visible rather than being flattened into fabricated consensus.
+
+The ledger is the evidence/control plane.
+
+The projection service is the memory serving/data plane.
+
+Agents must not use the ledger as their primary memory query database.
+
+CORE PREMISE
+
+People do not remember organizational events identically.
+
+Enterprise memory must preserve the distinction between:
+
+- Observation: what a source reports seeing
+- Assertion: what a person or system claims
+- Interpretation: what someone believes the evidence means
+- Decision: an officially adopted operating position
+- Dissent: an objection or alternative interpretation
+- Action: something requested, authorized, executed, failed, or rolled back
+- Outcome: what was subsequently observed
+- Supersession: what replaced an earlier decision or policy
+- Revocation: something that is no longer valid
+- Dispute: a challenge to an assertion, interpretation, or decision
+
+An approved decision is not objective truth. It is an authorized operating position with scope, evidence, effective dates, dissent, and expected outcomes.
+
+Do not create a design that converts repeated summaries into “truth” merely because agents retrieve them frequently. Prevent institutional hallucination.
+
+TARGET ARCHITECTURE
+
+Use this separation:
+
+Agents and enterprise systems
+    -> submit candidate assertions, decisions, actions, and outcomes
+
+Governance admission boundary
+    -> validates schema, identity, authority, evidence, classification, and scope
+
+Immutable ledger
+    -> preserves admitted consequential evidence and history
+
+Projection worker
+    -> consumes committed events idempotently and builds current state
+
+Shared-memory projection store
+    -> supports fast current-state and historical queries
+
+Agent context gateway
+    -> returns identity-aware, purpose-limited context bundles
+
+The ledger records consequential changes.
+
+Projections calculate what those changes mean now.
+
+The ledger history is immutable. Projection state is mutable, reproducible, and disposable.
+
+RED HAT ALIGNMENT
+
+The primary enterprise deployment target is Red Hat OpenShift and Red Hat AI, with OpenShell used for governed agent execution.
+
+Keep the OSS implementation upstream-friendly and vendor-neutral. Do not create a Red Hat-only core or require proprietary services.
+
+Make OpenShift and OpenShell first-class integration and deployment targets through adapters, interfaces, and deployment overlays.
+
+Use this responsibility boundary:
+
+- OpenShell: sandboxing, runtime policy enforcement, process/network/filesystem controls, inference routing, and runtime security observations
+- Immutable-ledger: consequential governance evidence and historical provenance
+- Memory projections: current decisions, policies, actions, outcomes, disputes, and agent context
+- OpenShift: workload orchestration, tenancy, operations, identity integration, observability, and hybrid-cloud deployment
+
+Do not position OpenShell as the memory system.
+
+Do not position immutable-ledger as the runtime policy engine.
+
+Do not claim that planned Red Hat/OpenShell integration is already a generally available production capability. Keep product-readiness claims factual and evidence-based.
+
+Primary references:
+
+- https://github.com/NVIDIA/OpenShell
+- https://docs.nvidia.com/openshell/observability/logging
+- https://www.redhat.com/en/about/press-releases/red-hat-ai-factory-nvidia-expands-support-new-class-autonomous-agents-enterprise
+- https://developers.redhat.com/articles/2026/05/14/every-layer-counts-defense-depth-ai-agents-red-hat-ai
+
+OPENSHELL EVENT BOUNDARY
+
+OpenShell emits OCSF runtime and security events covering areas such as:
+
+- sandbox lifecycle
+- process execution and termination
+- network activity
+- HTTP activity
+- policy allow and deny decisions
+- filesystem enforcement and degradation
+- configuration and policy changes
+- runtime security findings
+- middleware transformations
+- inference routing
+
+Do not write every OpenShell event into immutable-ledger.
+
+Raw and high-volume OpenShell telemetry belongs in an operational telemetry, observability, or security-event system.
+
+Promote only consequential events into the governance ledger, such as:
+
+- high-risk denied actions
+- approved policy changes
+- policy enforcement degradation
+- security findings
+- credential or inference-routing anomalies
+- execution that materially changes enterprise state
+- execution failure or rollback
+- exceptions requiring human approval
+- outcomes associated with governed decisions
+- changes in policy authority or effective scope
+
+Routine allowed network calls, ordinary process events, health signals, and repetitive telemetry should not create ledger writes unless an explicit records policy requires them.
+
+The existing OCSF adapter may remain useful for demonstrations and evidence collection, but do not assume that writing every OCSF event to the ledger is the production shared-memory architecture.
+
+OPENSHELL CORRELATION CONTRACT
+
+Preserve these fields where available:
+
+- OpenShell sandbox ID
+- OpenShift cluster and namespace
+- Kubernetes service account
+- workload or SPIFFE identity
+- pod and container identity
+- container image digest
+- agent ID
+- process identity
+- binary identity and hash
+- parent process lineage
+- trace ID and span ID
+- correlation ID
+- OpenShell policy ID
+- policy revision
+- policy hash
+- OPA/Rego decision reference
+- enforcement disposition: allowed, denied, blocked, or transformed
+- denial reason
+- OCSF class UID and activity
+- event time
+- environment identity
+- evidence object reference
+
+Do not infer trusted identity from a sandbox name or user-supplied agent ID when platform workload identity is available.
+
+PERFORMANCE AND INFRASTRUCTURE CONSTRAINTS
+
+Infrastructure load is a primary design constraint.
+
+The solution must ensure:
+
+- Ordinary memory reads make zero ledger calls.
+- Context assembly makes zero ledger calls.
+- Agents do not call VerifyProof for every returned memory.
+- Raw prompts, chain-of-thought, routine telemetry, and ordinary tool calls are not stored in the ledger.
+- High-risk or irreversible operations may synchronously wait for a ledger receipt.
+- Lower-risk observations and outcomes may use asynchronous durable delivery.
+- Projection processing is at-least-once and idempotent.
+- A projection can be rebuilt deterministically by replaying history.
+- Projectors track offsets, freshness, schema version, failures, and checkpoints.
+- Proof status is cached or periodically verified.
+- Full verification is performed during audit, replay, checkpoint validation, or high-risk workflows.
+- Hot entry_type chains are avoided through intentional domain, source, or tenant partitioning.
+- Backpressure and lag are observable.
+- The architecture can later support batch ingestion and signed checkpoints.
+
+A projector may retrieve one complete ledger entry for each sparse consequential event if required by the current outbox contract. Do not place that retrieval on the agent read path. Introduce a source abstraction that can support batch retrieval or streaming envelopes later.
+
+Do not add Kafka, AMQ Streams, a graph database, or a vector database merely to make the architecture appear enterprise-ready. Use interfaces for future infrastructure and implement the smallest coherent slice with existing repository patterns.
+
+MEMORY CONTRACT
+
+Define a versioned MemoryEventV1 or DecisionMemoryV1 contract containing at least:
+
+- memory_id
+- schema_version
+- kind
+- subject
+- assertion or decision summary
+- rationale_summary
+- status
+- authority
+- actor_id
+- source_id
+- scope
+- audience
+- purpose
+- classification
+- confidence
+- valid_from
+- valid_until
+- recorded_at
+- policy_id
+- policy_version
+- evidence_refs
+- input_hash
+- correlation_id
+- supersedes
+- disputed_by
+- expected_outcomes
+- observed_outcomes
+- ledger_entry_id
+- ledger_entry_hash
+- hash_version
+
+Use bitemporal semantics:
+
+- recorded_at means when the ledger accepted the event.
+- valid_from and valid_until mean when the memory applies to the enterprise.
+
+Do not store raw chain-of-thought. Store concise rationale summaries and references to governed source evidence.
+
+Large documents and sensitive payloads should remain in governed source systems or object storage. The memory record should contain controlled references and digests where appropriate.
+
+INITIAL EVENT KINDS
+
+Implement these initial event kinds:
+
+- memory.assertion.proposed
+- memory.assertion.disputed
+- memory.assertion.revoked
+- governance.decision.approved
+- governance.decision.rejected
+- governance.decision.superseded
+- governance.dissent.recorded
+- action.requested
+- action.authorized
+- action.executed
+- action.failed
+- action.rolled_back
+- outcome.observed
+
+Do not use a single generic event type if doing so removes meaningful governance semantics.
+
+FIRST VERTICAL SLICE
+
+Implement an executable strategy-decision scenario:
+
+1. A strategy assertion is proposed.
+2. A dissenting interpretation is recorded.
+3. An authorized party approves a bounded strategy decision.
+4. The decision becomes effective without erasing the dissent.
+5. An action is authorized under the decision.
+6. An agent in an OpenShell sandbox attempts the action.
+7. OpenShell initially denies the action under the current policy.
+8. The routine underlying telemetry remains outside the ledger.
+9. The consequential denial is admitted as governance evidence.
+10. A bounded policy exception is reviewed and approved.
+11. The approval is written to immutable-ledger.
+12. OpenShell receives or is modeled as receiving the updated policy revision.
+13. The agent executes the action.
+14. The execution result is recorded.
+15. An outcome is observed.
+16. A newer strategy decision supersedes the original.
+17. The current-state projection returns the newer decision.
+18. Historical queries retain the original decision, dissent, denial, exception, execution, and outcome.
+19. Every projected item links to ledger evidence or an explicitly labeled external evidence reference.
+20. A second authorized agent retrieves the current context without calling the ledger.
+21. An unauthorized agent cannot retrieve restricted decision or execution context.
+
+Use replayable OpenShell OCSF fixtures when a live OpenShift/OpenShell environment is unavailable. Label fixture-based evidence separately from live integration evidence.
+
+PROJECTION REQUIREMENTS
+
+Create a projection component that:
+
+- Consumes committed ledger or outbox events.
+- Retrieves the complete entry only when necessary.
+- Applies events idempotently.
+- Tracks a durable processing offset or cursor.
+- Detects duplicate delivery.
+- Records poison or failed events without stopping unrelated processing.
+- Supports deterministic full replay.
+- Preserves ledger and external evidence references.
+- Never changes ledger history.
+- Handles supersession, revocation, disputes, and effective dates.
+- Exposes a freshness watermark.
+- Reports whether it is caught up.
+- Distinguishes trusted, untrusted, quarantined, and rejected events.
+- Does not silently promote unverified assertions into current official memory.
+
+Start with structured PostgreSQL projections such as:
+
+- current_effective_decisions
+- decision_history
+- active_actions
+- action_outcomes
+- unresolved_disputes
+- memory_evidence_links
+- projection_failures
+- memory_projection_status
+
+Keep projection storage logically separate from immutable ledger tables. Do not grant the memory projector UPDATE or DELETE privileges on ledger entries.
+
+A projection is a derived view and may be updated or rebuilt. The evidence ledger remains immutable.
+
+AGENT CONTEXT API
+
+Design and implement the smallest useful API surface:
+
+- GetCurrentDecision(subject, as_of, identity, purpose)
+- GetDecisionHistory(memory_id, identity, purpose)
+- GetOpenActions(subject, identity, purpose)
+- GetAgentContext(task, identity, purpose)
+- ExplainMemory(memory_id, identity, purpose)
+- GetProjectionStatus()
+
+Every returned memory item must indicate:
+
+- whether it is an observation, assertion, interpretation, decision, dissent, action, or outcome
+- its authority and scope
+- effective, superseded, revoked, disputed, or proposed status
+- confidence and caveats
+- valid time
+- recorded time
+- projection freshness
+- classification
+- evidence references
+- ledger entry and hash version where applicable
+- why it was selected
+
+Define a versioned ContextBundleV1 containing:
+
+- selected memories
+- projection version
+- valid_as_of
+- freshness watermark
+- ledger checkpoint reference
+- classification
+- authorization or policy result
+- unresolved disputes or caveats
+- an optional memory-service signature interface
+
+Do not implement fake cryptographic signing. Provide a clear signer/verifier interface and development adapter if production key management is outside this slice.
+
+TRUST AND GOVERNANCE
+
+Do not assume that a valid ledger hash proves an assertion is true.
+
+Keep these properties separate:
+
+- ledger-envelope integrity
+- chain linkage
+- writer identity
+- writer authority
+- signature validity
+- attestation validity
+- evidence quality
+- policy compliance
+- authorization
+- decision effectiveness
+- observed outcome
+
+The current ledger binds optional signature and attestation bytes in V3 but does not validate their meaning or trust chain. The memory admission layer must not describe opaque values as verified identity or verified runtime attestation.
+
+Provide interfaces for:
+
+- workload identity resolution
+- signature validation
+- attestation appraisal
+- authority evaluation
+- classification policy
+- memory admission
+- retrieval authorization
+
+The first OSS slice may use explicit deterministic development implementations, but they must be labeled as development-only.
+
+ACCESS CONTROL
+
+Memory retrieval must be identity-, tenant-, classification-, scope-, and purpose-aware.
+
+Implement a clear authorization-policy interface and a deterministic development policy.
+
+Do not hardcode that every agent can retrieve every memory.
+
+A missing or unverifiable workload identity must cause the event or request to be rejected, quarantined, or treated as untrusted according to explicit policy.
+
+OPENSHIFT DEPLOYMENT REQUIREMENTS
+
+The vertical slice must be deployable on OpenShift without assuming unrestricted Kubernetes privileges.
+
+Provide or document:
+
+- namespace-scoped service accounts
+- least-privilege Kubernetes RBAC only where Kubernetes API access is required
+- non-root execution where technically possible
+- SecurityContextConstraints requirements
+- NetworkPolicy boundaries
+- TLS and service-to-service authentication expectations
+- secret references rather than embedded credentials
+- readiness, liveness, and startup probes
+- resource requests and limits
+- horizontal scaling behavior
+- PodDisruptionBudget considerations
+- projection-worker leader election or partitioning requirements
+- PostgreSQL connectivity and credential rotation
+- OpenTelemetry metrics, traces, and logs
+- disconnected and air-gapped image mirroring
+- multi-cluster and hybrid-cloud identity fields
+- optional OpenShift Route exposure for operator-facing APIs
+- optional UBI-based Containerfile or deployment overlay without making UBI mandatory for upstream development
+- rootless Podman-based local development where practical
+
+Document any OpenShell capability requiring elevated privileges, special nodes, kernel features, SecurityContextConstraints changes, or host configuration. Do not silently request privileged execution.
+
+Do not claim FIPS compliance, confidential-computing assurance, or hardware-attestation support unless implemented and tested. Document compatibility boundaries and future work.
+
+SEMANTIC RETRIEVAL
+
+Do not add semantic retrieval in the first implementation unless the structured vertical slice is complete.
+
+When added later:
+
+- embeddings must be disposable derived indexes
+- source records and ledger evidence remain authoritative
+- retrieval must preserve classification and tenant scope
+- summaries must retain evidence links
+- inferred summaries must never be mislabeled as approved decisions
+- contradictions and dissent must remain visible
+
+OBSERVABILITY
+
+Add metrics and health reporting for at least:
+
+- events received
+- events projected
+- duplicate deliveries
+- rejected or quarantined events
+- projection failures
+- retry count
+- dead-letter or failed-event count
+- current projection offset
+- projection lag
+- freshness watermark
+- replay status
+- query count and latency
+- authorization denials
+
+Readiness must reflect projection-store availability and clearly report lag state. Do not make the service permanently unavailable merely because a configurable noncritical lag threshold is exceeded; expose degraded state explicitly.
+
+DELIVERABLES
+
+Produce:
+
+1. docs/shared-enterprise-memory-architecture.md
+2. An ADR explaining why immutable-ledger is the evidence plane and projections are the serving plane.
+3. A threat model covering institutional hallucination, writer impersonation, unauthorized retrieval, projection poisoning, replay, stale context, and cross-tenant leakage.
+4. Versioned MemoryEventV1 and ContextBundleV1 contracts.
+5. Projection database migrations.
+6. An idempotent projection worker.
+7. The minimal agent-context API.
+8. Replayable OpenShell OCSF fixtures.
+9. An executable strategy-decision demonstration.
+10. Unit and integration tests.
+11. Metrics and health endpoints.
+12. OpenShift deployment manifests or overlays appropriate to the existing repository.
+13. Local development instructions.
+14. A remaining-gap assessment.
+15. A next-phase roadmap covering batch ingestion, signed checkpoints, semantic retrieval, privacy, HA, enterprise identity, and live OpenShell/OpenShift validation.
+
+ACCEPTANCE TESTS
+
+At minimum, prove:
+
+- Replaying the same event twice does not duplicate projected state.
+- A full replay produces the same projection state.
+- Decision B superseding Decision A makes B current without deleting A.
+- Dissent remains visible after an official decision is approved.
+- A revoked decision is not returned as current.
+- Assertions are not mislabeled as approved decisions.
+- An agent current-state query makes zero synchronous ledger calls.
+- Every projected result includes an evidence reference.
+- Projection freshness and lag are visible.
+- Failed events are isolated and recoverable.
+- Duplicate outbox or OCSF delivery is idempotent.
+- Out-of-order events are handled deterministically or quarantined with a clear recovery path.
+- Unauthorized identities cannot retrieve restricted memory.
+- Missing workload identity does not create trusted memory.
+- High-volume routine OpenShell events do not create ledger writes.
+- Consequential OpenShell denials can be promoted by configurable admission policy.
+- One correlation ID links intent, enforcement, approval, execution, and outcome.
+- OpenShell policy revision and hash remain visible.
+- A superseded policy exception is not returned as effective.
+- Historical queries reconstruct what was asserted and approved at a specified time.
+- Fixture evidence is labeled separately from live evidence.
+- Existing immutable-ledger V2 and V3 tests continue to pass.
+- No existing proof-envelope compatibility contract is weakened.
+
+WORKFLOW
+
+Before coding:
+
+1. Inspect the repository architecture, tests, adapters, outbox, API, metrics, migrations, and merged V3 implementation.
+2. Inspect the existing OpenShell OCSF and Kagenti/OpenTelemetry adapters.
+3. Identify reusable repository patterns.
+4. Produce a concise implementation plan.
+5. Identify any conflicts between this prompt and the current repository.
+6. State what will be implemented in this first vertical slice and what will remain documented future work.
+
+Then implement the smallest coherent end-to-end slice.
+
+Use small, focused diffs. Match existing patterns. Do not create a separate repository without approval. Do not add infrastructure solely for architectural appearance.
+
+Do not pause for routine implementation choices. Ask only when a material choice would change the product boundary, trust model, or deployment scope.
+
+VALIDATION
+
+Run all relevant checks, including:
+
+- existing Rust tests
+- new projection tests
+- formatting
+- linting with warnings denied
+- dependency audits
+- Python tests where applicable
+- frontend build if frontend code changes
+- migration verification
+- replay determinism tests
+- duplicate-delivery tests
+- OpenShift manifest validation where tooling is available
+- fixture-based OpenShell integration tests
+
+Do not overwrite historical evidence files with results from a different environment. Clearly distinguish local contract evidence from live OpenShift/OpenShell evidence.
+
+COMPLETION REPORT
+
+At completion, report:
+
+- what was implemented
+- architecture decisions
+- memory and evidence contracts
+- Red Hat/OpenShift alignment
+- OpenShell integration boundary
+- infrastructure and performance characteristics
+- trust and authorization boundaries
+- tests and evidence
+- known limitations
+- exact recommended next slice
+
+Do not merge into main or open a pull request unless explicitly requested.
+
+The completed work must demonstrate this principle:
+
+“OpenShell observes and constrains execution. Immutable-ledger preserves consequential evidence. Governance establishes the operating position. Projections explain current state. Outcomes show what happened next.”
+12:05 PM
+use tdd edd cdd bdd cbt red green matrix rubric for this. it should earn the right to production.
+
+12:06 PM
+Worked for 53s
+Yes. Production must be an earned state, never inferred from “tests passed.”
+
+I’m defining CBT as Controls- and Capability-Based Testing because the acronym is not standardized across these methods. CDD remains contract-first, consistent with established Contract-Driven Development practice.
+
+Add the following verbatim to the Claude CLI prompt:
+
+PRODUCTION QUALIFICATION: TDD + EDD + CDD + BDD + CBT
+
+Treat production readiness as a provable state. The default status of every capability and control is RED. Code completion, a successful demo, fixture-based integration, or a passing happy path does not earn production status.
+
+For this project, use these definitions:
+
+- TDD — Test-Driven Development:
+  Write a failing automated test before production implementation. Follow Red → Green → Refactor. Every defect requires a regression test. Apply this to reducers, projectors, authorization, tenant isolation, signatures, bitemporal behavior, supersession, revocation, replay, and idempotency.
+
+- EDD — Evidence-Driven Development:
+  Every requirement, claim, control, and production-readiness decision must point to reproducible evidence. Record the command, result, timestamp, git SHA, environment, configuration, image digest where applicable, and generated artifact. A capability cannot be GREEN based only on narrative or developer assertion.
+
+- CDD — Contract-Driven Development:
+  Define executable contracts before implementation. This includes MemoryEventV1, ContextBundleV1, projector inputs, database boundaries, REST APIs, OpenShell/OCSF mappings, identity claims, and error responses. Add provider and consumer contract tests, compatibility tests, and explicit versioning behavior.
+
+- BDD — Behavior-Driven Development:
+  Express important system behavior in business-readable Given/When/Then scenarios. Cover divergent recollections, dissent, supersession, revocation, disputes, authorization boundaries, OpenShell execution outcomes, projection lag, and degraded dependencies.
+
+- CBT — Controls- and Capability-Based Testing:
+  Capability tests prove that a required business capability works end to end. Control tests prove that security, governance, privacy, reliability, and operational safeguards prevent or contain prohibited behavior.
+
+MANDATORY RED-GREEN LOOP
+
+For every vertical slice:
+
+1. Define the requirement and falsifiable claim.
+2. Add or update its production-readiness matrix row as RED.
+3. Define the contract and compatibility expectations.
+4. Write the failing TDD test and relevant BDD scenarios.
+5. Identify the controls that protect the capability.
+6. Run the test and confirm it fails for the expected reason.
+7. Implement the minimum necessary code.
+8. Run the test and make it GREEN.
+9. Refactor while preserving GREEN.
+10. Run integration, contract, behavior, control, and regression suites.
+11. Capture reproducible EDD evidence.
+12. Update the matrix only after the evidence exists.
+
+Never write production code first and backfill tests merely to confirm the existing implementation.
+
+RED-GREEN EVIDENCE MATRIX
+
+Create:
+
+- tests/shared-memory/EVIDENCE_MATRIX.md
+- tests/shared-memory/evidence-results.json
+- docs/production-readiness-rubric.md
+
+Do not overwrite or reinterpret historical evidence from PR #8.
+
+Every matrix row must include:
+
+- ID
+- layer or capability
+- requirement
+- falsifiable claim
+- principal risk
+- method: TDD, EDD, CDD, BDD, CBT, or combination
+- test or evidence artifact
+- environment in which it was exercised
+- status: RED, YELLOW, or GREEN
+- owner
+- execution timestamp
+- git commit SHA
+- waiver, rationale, owner, compensating control, and expiration if applicable
+
+Status definitions:
+
+- RED:
+  Missing, failing, untested, non-reproducible, or contradicted by evidence.
+
+- YELLOW:
+  Partially demonstrated or fixture-tested, but missing production-like evidence, control validation, scale validation, or required review. YELLOW is never production-ready.
+
+- GREEN:
+  The claim has reproducible automated evidence, required controls have passed, results are tied to the current commit and environment, and no contradictory evidence remains.
+
+If evidence is stale, unverifiable, tied to a different commit, or from a materially different deployment configuration, return the row to RED or YELLOW.
+
+MANDATORY TEST SUITES
+
+Implement proportionate coverage at these levels:
+
+1. Unit tests
+   - Reducers and deterministic projection logic
+   - Trust-state derivation
+   - Bitemporal ordering
+   - Supersession and revocation
+   - Decision and action lifecycle
+   - Filtering and minimization
+   - Authorization decisions
+
+2. Contract tests
+   - MemoryEventV1 and ContextBundleV1 schemas
+   - API request and response contracts
+   - OpenShell/OCSF normalization
+   - Database and projector boundaries
+   - Backward compatibility
+   - Unknown event-type behavior
+   - V2 and V3 signature semantics
+
+3. Component tests
+   - Projector service
+   - Outbox or checkpoint processing
+   - Context retrieval
+   - Admission policy
+   - Identity propagation
+   - Classification filters
+
+4. Integration tests
+   - Real PostgreSQL
+   - Migrations
+   - Duplicate delivery
+   - Out-of-order delivery
+   - Replay and checkpoint recovery
+   - Projection rebuild
+   - Transaction and failure boundaries
+
+5. BDD end-to-end tests
+   - Divergent human recollections remain distinct
+   - A decision records supporting and dissenting interpretations
+   - Supersession changes effective state without erasing history
+   - An OpenShell denial becomes evidence only when consequential
+   - Execution outcomes update action state
+   - Unauthorized users cannot retrieve restricted context
+   - Stale or degraded projections are disclosed rather than silently trusted
+
+6. Security and abuse tests
+   - Cross-tenant access attempts
+   - Forged identity and signature input
+   - Classification bypass
+   - Prompt or payload injection
+   - Oversized events
+   - Replay attacks
+   - Enumeration attempts
+   - Fail-open dependency behavior
+   - Secret exposure
+   - Privilege escalation
+
+7. Performance and scalability tests
+   - Read throughput
+   - Write throughput
+   - Projection lag
+   - Duplicate-event amplification
+   - Queue backpressure
+   - Rebuild duration
+   - Concurrent tenant behavior
+   - Storage growth
+   - Soak behavior
+
+8. Resilience tests
+   - Projector restart
+   - Database interruption
+   - Ledger interruption
+   - Partial transaction failure
+   - Poison events
+   - Checkpoint corruption
+   - Backup and restore
+   - Full deterministic replay
+   - Network partition
+   - Graceful degradation
+
+9. Deployment and lifecycle tests
+   - OpenShift deployment
+   - Non-root execution
+   - Restricted security context
+   - NetworkPolicy
+   - Resource limits
+   - Health and readiness probes
+   - Upgrade
+   - Schema migration
+   - Rollback
+   - Image provenance and digest pinning
+
+10. Live integration tests
+    - Fixture-based OpenShell tests first
+    - Real OpenShell integration only when available
+    - Clearly label fixture, simulated, and live evidence
+    - Never represent fixture evidence as live production proof
+
+BEHAVIOR SCENARIOS REQUIRED BEFORE IMPLEMENTATION
+
+At minimum, write executable Given/When/Then scenarios for:
+
+- Two people remember the same event differently.
+- An observation and an interpretation disagree.
+- A decision is made despite recorded dissent.
+- A decision is superseded but remains auditable.
+- An action is authorized and later completed.
+- An action is denied by OpenShell policy.
+- An approved exception is exercised.
+- A routine OCSF event is correctly excluded from the immutable ledger.
+- A consequential execution event is promoted into immutable evidence.
+- A projection receives the same event twice.
+- Events arrive out of order.
+- A complete projection rebuild produces the same effective state.
+- A user lacks permission for part of a context bundle.
+- A tenant attempts to retrieve another tenant’s memory.
+- The projection is stale or unavailable.
+- A V2 checksum is incorrectly presented as a verified signer.
+- A V3 signature fails verification.
+- Revoked or disputed evidence appears with the correct trust state.
+
+PERFORMANCE QUALIFICATION
+
+Do not invent successful performance claims.
+
+Before implementation, propose measurable budgets for:
+
+- Zero ledger calls on the normal agent read path
+- Maximum projection-read latency at p95 and p99
+- Maximum projection lag
+- Sustainable consequential-event ingestion rate
+- Burst capacity and backpressure behavior
+- Maximum rebuild time at representative scale
+- Duplicate and retry tolerance
+- Storage growth
+- Per-tenant fairness
+- Recovery time and recovery point objectives
+
+Mark each performance row RED until the budget is agreed and measured. Clearly separate local-development results from production-like OpenShift results.
+
+PRODUCTION READINESS RUBRIC
+
+Score each category from 0 through 4:
+
+- 0: absent
+- 1: designed but not demonstrated
+- 2: works in development or fixtures
+- 3: demonstrated in a production-like environment
+- 4: reproducible, controlled, observed, and operationally owned
+
+Apply these weights:
+
+- Correctness and deterministic projection: 15
+- Contracts and compatibility: 10
+- Security, identity, and authorization: 15
+- Tenant isolation, privacy, and data governance: 10
+- Resilience, replay, backup, and recovery: 10
+- Performance, scale, and backpressure: 10
+- Observability and operations: 10
+- OpenShift and OpenShell integration: 10
+- Supply-chain and evidence integrity: 5
+- Documentation, usability, and runbooks: 5
+
+Normalize the result to 100 points.
+
+Production requires:
+
+- At least 90/100
+- No critical RED rows
+- Every P0 and P1 requirement GREEN
+- No security or tenant-isolation row below GREEN
+- No expired waiver
+- Two consecutive successful production-candidate executions
+- A production-like OpenShift deployment
+- Contract compatibility proof
+- Load and soak evidence
+- Backup and restore evidence
+- Deterministic replay evidence
+- Upgrade and rollback evidence
+- Security and abuse-test evidence
+- Observability and alert validation
+- An independent human review and explicit promotion decision
+
+The numerical score cannot override a veto condition.
+
+AUTOMATIC NO-GO CONDITIONS
+
+The result is NO-GO if any of these are true:
+
+- A normal read requires a ledger call.
+- Cross-tenant data exposure is possible.
+- Authorization fails open.
+- Unverified input is presented as trusted evidence.
+- A V2 checksum is represented as signer-bound verification.
+- Duplicate delivery changes effective state.
+- Replay produces a different projection.
+- Projection rebuild loses dissent, supersession, revocation, or provenance.
+- Routine OpenShell/OCSF telemetry floods the immutable ledger.
+- Fixture evidence is labeled as live integration evidence.
+- Consequential actions lack actor and correlation provenance.
+- Required secrets are embedded in images, manifests, logs, or source.
+- Backup restore or rollback has not been demonstrated.
+- Critical vulnerabilities remain without an explicit time-bounded exception.
+- Observability cannot distinguish ledger, projection, policy, and dependency failures.
+- A required GREEN result cannot be reproduced from the recorded evidence.
+
+PROMOTION STAGES
+
+Stage 1 — Development:
+Unit tests, schema tests, contracts, fixtures, and deterministic reducers.
+
+Stage 2 — Integration:
+Real PostgreSQL, migrations, projector checkpoints, duplicate delivery, replay, rebuild, and failure boundaries.
+
+Stage 3 — OpenShift staging:
+Restricted deployment, service identity, tenant enforcement, NetworkPolicy, observability, fixture-based OpenShell integration, upgrade, and rollback.
+
+Stage 4 — Production candidate:
+Live integration where available, security testing, representative load, soak testing, failure injection, backup restore, disaster recovery, and two consecutive complete GREEN runs.
+
+Stage 5 — Production:
+Manual promotion checkpoint with signed evidence summary, named owner, residual-risk statement, and rollback authority.
+
+No lower stage may claim evidence belonging to a higher stage.
+
+WAIVERS
+
+Waivers cannot silently convert RED into GREEN.
+
+Every waiver must include:
+
+- Exact failed or missing requirement
+- Business justification
+- Risk severity
+- Named accountable owner
+- Compensating control
+- Scope
+- Creation date
+- Expiration date
+- Remediation issue
+- Explicit approval
+
+Critical security, tenant isolation, evidence-integrity, deterministic-replay, backup-restore, and authorization failures are not waivable for production.
+
+REQUIRED COMPLETION REPORT
+
+At the end, report:
+
+1. What was implemented
+2. The Red → Green history for each vertical slice
+3. Tests written before implementation
+4. Contracts added or changed
+5. BDD scenarios and results
+6. Controls and capability tests
+7. Evidence artifacts and exact commands
+8. Performance results and environment
+9. Production-readiness matrix summary
+10. Weighted rubric score
+11. All RED and YELLOW rows
+12. Waivers and expiration dates
+13. Residual risks
+14. Recommended next slice
+15. Final verdict: NO-GO, CONDITIONAL, or GO
+
+Do not issue GO merely because the implementation is functional. Issue GO only when the repository has earned it under this rubric. For an initial OSS vertical slice without live production-like OpenShift and OpenShell evidence, the truthful result will normally be NO-GO or CONDITIONAL.
+This makes the development loop strict: TDD proves the code, CDD proves the boundaries, BDD proves the behavior, CBT proves the controls and capabilities, and EDD proves that the other proofs actually happened.
+
+12:07 PM
+full prompt please
+
+12:07 PM
+Worked for 37s
+Paste this as one prompt into Claude CLI:
+
+You are acting as a principal open-source platform architect, security engineer, and test engineer.
+
+Your task is to extend the ARE Immutable Ledger repository into the first production-qualifiable foundation for shared enterprise memory for AI agents.
+
+Repository:
+
+https://github.com/jkershawrh/are-immutable-ledger.git
+
+PR #8 has already been merged. Begin from the latest main branch and treat the merged ledger hardening as the baseline.
+
+This is an OSS implementation intended to be architecturally aligned with Red Hat enterprise environments, OpenShift, and OpenShell without claiming Red Hat endorsement, support, certification, or access to proprietary systems.
+
+The result must earn the right to production through evidence. Do not equate “implemented,” “works locally,” “demoed,” or “tests passed” with production readiness.
+
+Use:
+
+- TDD — Test-Driven Development
+- EDD — Evidence-Driven Development
+- CDD — Contract-Driven Development
+- BDD — Behavior-Driven Development
+- CBT — Controls- and Capability-Based Testing
+- A RED/YELLOW/GREEN evidence matrix
+- A weighted production-readiness rubric
+- Explicit NO-GO, CONDITIONAL, or GO qualification
+
+Do not stop after producing a design. Inspect the repository, create a focused branch, implement the smallest useful vertical slice, test it, document it, and prepare a reviewable pull request.
+
+===============================================================================
+1. STARTING WORKFLOW
+===============================================================================
+
+First:
+
+1. Confirm the repository and current working tree.
+2. Read all repository instructions, including:
+   - AGENTS.md
+   - CLAUDE.md
+   - CONTRIBUTING.md
+   - README.md
+   - architecture documents
+   - existing evidence and test matrices
+3. Preserve unrelated user changes.
+4. Fetch the latest remote state.
+5. Start from the latest main branch using a fast-forward-only update.
+6. Confirm that PR #8 is present in the history.
+7. Inspect the implementation rather than assuming its language, storage model, API, or deployment approach.
+8. Run the existing test suite before changing code.
+9. Record the baseline result.
+10. Create this branch, or a close repository-conforming equivalent:
+
+   feature/shared-enterprise-memory-foundation
+
+Use small, reviewable commits. Do not rewrite history or use destructive Git commands.
+
+If repository reality differs from this prompt, preserve the architectural intent while following established repository patterns. Document any material deviation and why it was necessary.
+
+===============================================================================
+2. OBJECTIVE
+===============================================================================
+
+Build the first OSS vertical slice that demonstrates how an immutable ledger can serve as the evidence and governance foundation for shared enterprise memory used by agents.
+
+The immutable ledger is not itself the complete enterprise brain.
+
+Use this separation:
+
+- Immutable ledger:
+  Canonical evidence, provenance, consequential decisions, actions, outcomes, disputes, supersession, revocation, integrity information, and governance history.
+
+- Projection layer:
+  Rebuildable, query-optimized, tenant-aware, authorization-aware representations of effective enterprise memory.
+
+- Context service:
+  Returns bounded, task-relevant, authorized context bundles to agents without requiring them to scan the ledger.
+
+- Semantic retrieval:
+  A future optional layer over approved projections. It is not the source of truth and is not required for this first vertical slice.
+
+The architectural principle is:
+
+    Ledger = immutable evidence and governance spine
+    Projection = effective shared memory
+    Context bundle = authorized working memory for an agent
+
+Agents do not need every enterprise event or every human recollection.
+
+Agents generally need:
+
+- Active decisions
+- Current commitments and actions
+- Applicable constraints
+- Approved exceptions
+- Relevant observations and assertions
+- Material outcomes
+- Unresolved disputes and dissent
+- Supersession and revocation state
+- Provenance and trust state
+- Enough history to explain why the effective state exists
+
+Agents generally do not need:
+
+- Every raw OpenShell event
+- Every OCSF telemetry record
+- Routine execution noise
+- Unfiltered logs
+- Every intermediate human thought
+- Unrelated subjects or tenants
+- Data outside their authorization or task scope
+
+===============================================================================
+3. CORE TRUTHS
+===============================================================================
+
+Preserve these truths throughout the design and implementation:
+
+1. Immutability proves that a recorded event has not been silently rewritten. It does not prove that the event’s claim is objectively true.
+
+2. A valid checksum proves content integrity under its stated mechanism. It does not necessarily prove who signed or originated the content.
+
+3. A cryptographic signature can prove source authenticity and integrity when correctly verified. It still does not make the signed claim true.
+
+4. Humans can remember the same event differently. The system must preserve divergent observations, assertions, interpretations, and dissent rather than collapsing them into one falsely authoritative narrative.
+
+5. Effective enterprise state is derived. The original evidence remains immutable while projections can change as new evidence, decisions, supersession, revocation, or disputes arrive.
+
+6. A projection is disposable and rebuildable. The ledger is authoritative for recorded history; the projection is authoritative only for its declared derived view and checkpoint.
+
+7. An agent must never receive a projection as unquestionable truth. Context must expose provenance, trust state, effective time, recording time, disputes, staleness, and source references.
+
+8. Shared memory must be bounded by authorization, tenant, classification, subject, purpose, and time.
+
+9. The normal agent read path must make zero calls to the immutable ledger.
+
+10. Routine telemetry must not flood the ledger. Only consequential events should be promoted into governed evidence.
+
+11. Event selection, projection logic, and access policy are part of governance and must be testable, observable, and auditable.
+
+12. “Production-ready” is a claim that requires reproducible evidence tied to the current code, configuration, and environment.
+
+===============================================================================
+4. MEMORY MODEL
+===============================================================================
+
+Model shared enterprise memory as immutable claims and events, not mutable universal facts.
+
+At minimum, support or define these event concepts:
+
+- observation.recorded
+- assertion.recorded
+- interpretation.recorded
+- decision.recorded
+- dissent.recorded
+- action.proposed
+- action.authorized
+- action.started
+- action.completed
+- action.failed
+- action.denied
+- exception.approved
+- exception.exercised
+- outcome.recorded
+- evidence.linked
+- event.disputed
+- event.superseded
+- event.revoked
+
+Use repository-conforming naming if an event convention already exists.
+
+Every event must distinguish:
+
+- event identity
+- tenant
+- subject
+- actor
+- source
+- event type
+- schema version
+- recorded time
+- effective time
+- provenance
+- correlation
+- classification
+- payload
+- integrity mechanism
+- verification state
+- trust or claim state
+
+Do not create a single mutable “truth” field.
+
+A claim may have states such as:
+
+- unverified
+- integrity-verified
+- source-verified
+- corroborated
+- disputed
+- superseded
+- revoked
+
+These states must not be confused with objective truth.
+
+A dispute must coexist with the disputed event.
+
+Supersession must explicitly identify what was superseded and must not erase history.
+
+Revocation must change effective usability without deleting the original record.
+
+Dissent must remain discoverable even when an organization proceeds with a decision.
+
+===============================================================================
+5. CONTRACTS
+===============================================================================
+
+Use CDD and define executable contracts before implementation.
+
+Create versioned contracts equivalent to:
+
+A. MemoryEventV1
+
+Include fields equivalent to:
+
+- event_id
+- event_type
+- schema_version
+- tenant_id
+- subject_id
+- actor
+- source
+- recorded_at
+- effective_at
+- provenance
+- correlation
+- classification
+- claim_state
+- integrity
+- payload
+
+Actor and source should allow identifiers such as:
+
+- actor_id
+- actor_type
+- organization
+- service_account
+- workload identity
+- key identifier
+- agent identifier
+- human identifier
+
+Correlation should allow:
+
+- correlation_id
+- causation_id
+- trace_id
+- span_id
+- request_id
+- session_id
+- agent_id
+- action_id
+- OpenShell sandbox or workload identifier
+- policy-decision identifier
+- artifact digest
+
+B. ContextBundleV1
+
+Include fields equivalent to:
+
+- bundle_id
+- schema_version
+- tenant_id
+- subject_id
+- purpose
+- as_of
+- generated_at
+- projection_version
+- projection_checkpoint
+- staleness state
+- authorization scope
+- active decisions
+- active actions
+- applicable constraints
+- approved exceptions
+- material outcomes
+- relevant evidence
+- unresolved disputes
+- dissent
+- supersession references
+- provenance references
+- trust-state summaries
+- omitted-data indicators
+
+The context bundle must disclose:
+
+- When it was generated
+- The projection checkpoint used
+- Whether the view may be stale
+- What authorization scope was applied
+- Whether some records were omitted
+- Which source events support the derived state
+
+Do not include raw secrets or unrestricted sensitive payloads.
+
+Add:
+
+- Schema validation
+- Compatibility tests
+- Provider tests
+- Consumer tests
+- Unknown-field behavior
+- Unknown-event behavior
+- Unsupported-version behavior
+- Backward-compatibility expectations
+- Explicit contract evolution rules
+
+Do not silently reinterpret an existing contract version.
+
+===============================================================================
+6. INTEGRITY AND SIGNATURE TRUTH
+===============================================================================
+
+Inspect what PR #8 implemented.
+
+If the current version uses a deterministic checksum or content hash, describe it accurately. Do not call it signer-bound verification unless the implementation actually verifies a signature tied to an identity and key.
+
+Expose an explicit verification state.
+
+A result such as “checksum valid” must remain distinct from:
+
+- signer identified
+- signature verified
+- certificate trusted
+- key not revoked
+- claim corroborated
+- claim accepted as effective policy
+
+If authenticated signatures are outside the vertical slice, document them as a future version, such as V3, rather than overstating the current version.
+
+Add a regression test proving that a checksum-only event cannot be presented as signer-verified.
+
+===============================================================================
+7. PROJECTION ARCHITECTURE
+===============================================================================
+
+Implement a deterministic projection layer using repository-native patterns.
+
+If the repository has no established projection database, prefer PostgreSQL for the production path while allowing a lightweight test configuration when appropriate.
+
+The projector must:
+
+- Consume committed ledger events
+- Maintain a durable checkpoint
+- Tolerate at-least-once delivery
+- Be idempotent
+- Detect duplicates
+- Handle out-of-order events deterministically
+- Preserve causation and correlation
+- Apply explicit supersession
+- Apply explicit revocation
+- Preserve disputes and dissent
+- Separate recorded time from effective time
+- Expose projection lag
+- Resume safely after interruption
+- Support complete deterministic rebuild
+- Reject or quarantine malformed and unsupported events
+- Avoid silently skipping poison events
+- Provide observable failure state
+
+Implement projections or equivalent materialized views for:
+
+- Decision register
+- Action and commitment state
+- Evidence timeline
+- Trust and verification state
+- Dispute and dissent state
+- Approved exceptions
+- Subject context
+- Context bundles
+
+A rebuild from the same ordered canonical event set must produce the same effective projection.
+
+Do not rely on naive last-write-wins behavior.
+
+If two events conflict, preserve both and use explicit decision, supersession, authority, effective-time, or policy semantics to derive the effective view.
+
+===============================================================================
+8. PERFORMANCE AND INFRASTRUCTURE BOUNDARIES
+===============================================================================
+
+Infrastructure pressure is a central constraint.
+
+The normal agent request path must be:
+
+    Agent → Context API → Projection store/cache
+
+It must not be:
+
+    Agent → Context API → Immutable ledger scan
+
+Enforce:
+
+- Zero immutable-ledger calls on the normal read path
+- Sparse, consequential writes to the ledger
+- Bounded context bundles
+- Incremental projections
+- Batched projector consumption where appropriate
+- Durable checkpoints
+- Idempotent retry
+- Backpressure handling
+- Per-tenant isolation and fairness
+- Caching only when authorization and staleness semantics remain correct
+- Observable projection lag
+
+Do not dual-write non-transactionally to the ledger and projection.
+
+Use a safe boundary such as:
+
+- Ledger commit followed by projector consumption
+- Transactional outbox if it fits the current architecture
+- Another documented mechanism that prevents undetectable divergence
+
+Define measurable budgets before claiming success for:
+
+- Projection read latency at p50, p95, and p99
+- Context-bundle generation latency
+- Consequential-event ingestion rate
+- Projection lag
+- Burst capacity
+- Queue depth and backpressure
+- Retry behavior
+- Duplicate delivery
+- Rebuild duration
+- Storage growth
+- Tenant fairness
+- Recovery time objective
+- Recovery point objective
+
+Propose initial budgets but mark them RED until agreed and measured.
+
+Do not invent production performance numbers.
+
+===============================================================================
+9. OPENSHELL AND OCSF ALIGNMENT
+===============================================================================
+
+Create a clean adapter boundary for OpenShell.
+
+Do not tightly couple the shared-memory domain model to a particular OpenShell release, transport, or event shape.
+
+Where OpenShell exposes OCSF-aligned or similar execution/security events, normalize them through an adapter before deciding whether they become memory events.
+
+Capture correlation fields when available:
+
+- tenant
+- agent
+- session
+- sandbox
+- workload
+- tool
+- action
+- policy decision
+- execution result
+- trace
+- request
+- artifact digest
+- exception
+- actor
+- timestamp
+
+Implement a configurable consequential-event admission policy.
+
+Events likely eligible for immutable promotion include:
+
+- A governed action was proposed
+- An action was authorized
+- An action was denied
+- A policy exception was approved
+- An approved exception was exercised
+- A consequential action started
+- A consequential action completed or failed
+- An action produced a material outcome
+- A governed artifact or evidence reference was created
+- A security-relevant execution materially affected a decision or action
+- A policy decision changed effective execution state
+
+Events normally excluded from immutable promotion include:
+
+- Routine file reads
+- Routine process events
+- Repetitive network telemetry
+- Heartbeats
+- Debug logs
+- Unchanged status polls
+- Raw high-volume OCSF streams
+- Intermediate execution noise
+- Events with no governance, decision, action, exception, or outcome significance
+
+The admission decision itself must be testable and explainable.
+
+Provide:
+
+- OpenShell adapter interface
+- Representative fixtures
+- OCSF or source-event mapping documentation
+- Consequential-event filtering tests
+- Correlation propagation tests
+- An integration path that can later connect to a live OpenShell environment
+
+Clearly label evidence as:
+
+- fixture
+- simulated
+- integration
+- live
+
+Never present fixture evidence as live OpenShell validation.
+
+===============================================================================
+10. RED HAT AND OPENSHIFT ALIGNMENT
+===============================================================================
+
+Keep the OSS implementation vendor-neutral while making it natural to deploy in Red Hat environments.
+
+Provide an OpenShift-compatible deployment path using repository-native packaging. Choose Helm, Kustomize, plain manifests, or an Operator only after inspecting the existing repository. Do not introduce an Operator merely for appearance.
+
+Address:
+
+- Arbitrary non-root UID
+- No privileged container
+- No host namespace requirement
+- Restricted security context
+- seccomp
+- Dropped Linux capabilities
+- Read-only root filesystem where practical
+- Writable temporary paths explicitly mounted
+- ServiceAccount
+- Workload identity boundaries
+- Kubernetes Secrets or external secret integration
+- NetworkPolicy
+- Resource requests and limits
+- Liveness, readiness, and startup probes
+- Graceful shutdown
+- Pod disruption behavior
+- Horizontal scaling constraints
+- PostgreSQL connection handling
+- Migration ownership
+- Structured logging
+- Prometheus-compatible metrics
+- OpenTelemetry correlation where practical
+- Route or ingress as an optional layer
+- Image digest pinning for production examples
+- Software bill of materials
+- Dependency and image scanning
+- Upgrade and rollback instructions
+
+Prefer Red Hat UBI minimal images where technically and legally appropriate. If that does not fit the current repository, document the reasoning and keep the container OpenShift-compatible.
+
+Do not claim Red Hat certification.
+
+===============================================================================
+11. ENTERPRISE GOVERNANCE
+===============================================================================
+
+Implement or define enforceable boundaries for:
+
+- Tenant isolation
+- Subject scoping
+- Authentication
+- Authorization
+- RBAC or ABAC policy hooks
+- Classification
+- Purpose limitation
+- Data minimization
+- Provenance
+- Retention
+- Legal hold
+- Revocation
+- Projection visibility
+- Auditability
+- Regional or jurisdictional restrictions
+- Sensitive payload handling
+
+Prefer storing references, digests, classifications, and provenance in immutable records instead of copying sensitive content into the ledger.
+
+Document the distinction between:
+
+- Immutable historical evidence
+- Projection visibility
+- Data retention
+- Cryptographic erasure
+- Reference invalidation
+- Legal deletion requirements
+
+Do not pretend that append-only storage automatically resolves privacy, erasure, legal-hold, or jurisdictional obligations.
+
+Authorization must happen before returning a context bundle.
+
+Filtering after unrestricted retrieval is not sufficient.
+
+A context bundle must not leak:
+
+- Cross-tenant identifiers
+- Restricted source references
+- Hidden dissent
+- Classified payload fragments
+- Existence of records the caller is not allowed to enumerate
+
+===============================================================================
+12. CONTEXT API
+===============================================================================
+
+Implement the smallest repository-conforming API needed to retrieve projected context.
+
+An endpoint equivalent to the following is acceptable:
+
+    GET /v1/memory/subjects/{subject_id}/context
+
+Possible query parameters:
+
+- as_of
+- purpose
+- action_id
+- include_history
+- max_items
+
+The exact API should follow existing repository conventions.
+
+The API must:
+
+- Authenticate the caller
+- Enforce tenant and subject scope
+- Apply classification and purpose policy
+- Read from projections only
+- Return ContextBundleV1
+- Expose projection checkpoint
+- Expose staleness
+- Bound response size
+- Use deterministic ordering
+- Avoid leaking unauthorized record existence
+- Return explicit errors for unavailable, stale-beyond-policy, or unsupported states
+- Emit metrics without logging sensitive content
+
+If complete authentication infrastructure is not present, create a narrow interface and deterministic test implementation. Do not hard-code an insecure production bypass.
+
+===============================================================================
+13. OBSERVABILITY
+===============================================================================
+
+Add observable signals for:
+
+- Events accepted
+- Events rejected
+- Events quarantined
+- Duplicate events
+- Unsupported schemas
+- Projector checkpoint
+- Projection lag
+- Projection failures
+- Context requests
+- Context latency
+- Authorization denials
+- Stale-context responses
+- Rebuild progress
+- Ledger dependency health
+- Projection-store health
+- OpenShell adapter failures
+- Consequential-event admission outcomes
+
+Use structured logs and avoid logging sensitive payloads.
+
+Where possible, correlate:
+
+- event_id
+- correlation_id
+- causation_id
+- trace_id
+- tenant-safe identifier
+- projector checkpoint
+- context bundle ID
+
+Metrics must use bounded-cardinality labels.
+
+Provide initial alert recommendations and operator troubleshooting guidance.
+
+===============================================================================
+14. NON-GOALS FOR THIS SLICE
+===============================================================================
+
+Do not expand this first slice into:
+
+- A universal enterprise ontology
+- A full vector database platform
+- A graph database migration
+- A complete knowledge-management replacement
+- Automated adjudication of objective truth
+- Continuous ingestion of all enterprise telemetry
+- Storage of all prompts and model conversations
+- A proprietary Red Hat-only implementation
+- A tightly coupled OpenShell implementation
+- A new distributed system without demonstrated need
+- An autonomous production deployment
+- An unsupported claim of production readiness
+
+Semantic search can be documented as a later projection over governed context. It must not become the authoritative source.
+
+===============================================================================
+15. REQUIRED DELIVERABLES
+===============================================================================
+
+Produce a coherent vertical slice containing, as appropriate to the repository:
+
+1. Architecture decision record explaining:
+   - Ledger versus projection responsibilities
+   - Why agents receive bounded context
+   - How divergent human memories are preserved
+   - Why projections solve the read-load problem
+   - Consistency and staleness semantics
+   - Trust and verification semantics
+
+2. Threat model covering:
+   - Cross-tenant access
+   - Forged events
+   - Replay
+   - Duplicate delivery
+   - Projection poisoning
+   - Unauthorized context enumeration
+   - OpenShell event spoofing
+   - Sensitive-data leakage
+   - Denial of service
+   - Compromised projector
+   - Compromised signing key
+   - Misleading trust presentation
+
+3. Versioned MemoryEvent contract.
+
+4. Versioned ContextBundle contract.
+
+5. Deterministic projector.
+
+6. Projection database schema and migrations.
+
+7. Context retrieval API.
+
+8. Consequential-event admission policy.
+
+9. OpenShell/OCSF adapter boundary and fixtures.
+
+10. OpenShift-compatible deployment assets.
+
+11. Metrics, health checks, and structured logging.
+
+12. Unit, contract, component, integration, BDD, control, security, performance, resilience, upgrade, and rollback tests appropriate to the slice.
+
+13. Evidence matrix and machine-readable results.
+
+14. Production-readiness rubric.
+
+15. Operator runbook.
+
+16. Projection rebuild and recovery runbook.
+
+17. OpenShell integration guide.
+
+18. Backlog of deliberately deferred production gaps.
+
+19. Updated README showing the architecture and honest maturity status.
+
+Do not replace historical evidence introduced in earlier work. Add new evidence for this shared-memory slice.
+
+Prefer these paths unless repository conventions require close equivalents:
+
+- docs/architecture/shared-enterprise-memory.md
+- docs/architecture/shared-memory-threat-model.md
+- docs/production-readiness-rubric.md
+- docs/runbooks/projection-operations.md
+- docs/integrations/openshell.md
+- tests/shared-memory/EVIDENCE_MATRIX.md
+- tests/shared-memory/evidence-results.json
+- contracts/memory-event-v1.*
+- contracts/context-bundle-v1.*
+
+===============================================================================
+16. DEVELOPMENT METHODOLOGY
+===============================================================================
+
+Use the following definitions:
+
+TDD — Test-Driven Development
+
+Write a failing automated test before production implementation. Follow:
+
+    RED → GREEN → REFACTOR
+
+Every defect requires a regression test.
+
+Apply TDD to:
+
+- Reducers
+- Projectors
+- Admission policy
+- Authorization
+- Tenant isolation
+- Integrity state
+- Bitemporal behavior
+- Supersession
+- Revocation
+- Replay
+- Idempotency
+- Context assembly
+
+EDD — Evidence-Driven Development
+
+Every requirement, claim, control, and production-readiness decision must point to reproducible evidence.
+
+Evidence must record:
+
+- Command
+- Result
+- Exit code
+- Start and completion timestamp
+- Git SHA
+- Environment
+- Relevant configuration
+- Dependency versions
+- Image digest where applicable
+- Artifact location
+
+A capability cannot be GREEN based only on narrative, screenshots, implementation existence, or developer assertion.
+
+CDD — Contract-Driven Development
+
+Define executable contracts before implementation for:
+
+- MemoryEventV1
+- ContextBundleV1
+- Projector input
+- Persistence boundaries
+- REST APIs
+- OpenShell/OCSF mappings
+- Identity claims
+- Authorization results
+- Error responses
+
+Add provider, consumer, and compatibility tests.
+
+BDD — Behavior-Driven Development
+
+Express important system behavior in business-readable Given/When/Then scenarios.
+
+The scenarios must describe business and governance outcomes, not merely HTTP implementation details.
+
+CBT — Controls- and Capability-Based Testing
+
+Capability tests prove that a required business capability works end to end.
+
+Control tests prove that security, governance, privacy, reliability, and operational safeguards prevent or contain prohibited behavior.
+
+===============================================================================
+17. MANDATORY RED-GREEN LOOP
+===============================================================================
+
+For every vertical slice:
+
+1. Define the requirement.
+2. Define a falsifiable claim.
+3. Add its production-readiness matrix row as RED.
+4. Define the contract and compatibility expectations.
+5. Write the failing TDD test.
+6. Write or update the relevant BDD scenario.
+7. Identify the required controls.
+8. Run the test and confirm it fails for the expected reason.
+9. Implement the minimum necessary code.
+10. Run the test and make it GREEN.
+11. Refactor while preserving GREEN.
+12. Run contract, integration, behavior, control, and regression suites.
+13. Capture reproducible EDD evidence.
+14. Update the matrix only after the evidence exists.
+
+Do not implement first and then add tests that merely confirm the existing implementation.
+
+Do not mark a row GREEN because a test file exists.
+
+===============================================================================
+18. REQUIRED BDD SCENARIOS
+===============================================================================
+
+Write executable Given/When/Then scenarios for at least:
+
+1. Two people remember the same event differently.
+
+2. An observation and an interpretation disagree.
+
+3. A decision is made despite recorded dissent.
+
+4. A decision is superseded but remains auditable.
+
+5. A disputed assertion remains visible with its dispute state.
+
+6. An action is proposed and authorized.
+
+7. An authorized action completes with a material outcome.
+
+8. An action is denied by OpenShell policy.
+
+9. An approved exception is exercised.
+
+10. A routine OCSF event is excluded from the immutable ledger.
+
+11. A consequential OpenShell event is promoted into immutable evidence.
+
+12. A projection receives the same event twice.
+
+13. Events arrive out of order.
+
+14. A complete rebuild produces the same effective projection.
+
+15. A user lacks permission for part of a context bundle.
+
+16. One tenant attempts to retrieve another tenant’s memory.
+
+17. The projection is stale.
+
+18. The projection store is unavailable.
+
+19. A checksum-only event is incorrectly presented as signer-verified.
+
+20. A future authenticated signature fails verification.
+
+21. Revoked evidence remains historical but is excluded from effective use.
+
+22. A projection checkpoint resumes correctly after interruption.
+
+===============================================================================
+19. REQUIRED TEST SUITES
+===============================================================================
+
+Implement proportionate tests at these levels:
+
+A. Unit tests
+
+- Reducers
+- Deterministic ordering
+- Trust-state derivation
+- Bitemporal logic
+- Supersession
+- Revocation
+- Disputes
+- Dissent preservation
+- Decision state
+- Action lifecycle
+- Admission filtering
+- Authorization decisions
+- Context minimization
+
+B. Contract tests
+
+- MemoryEventV1
+- ContextBundleV1
+- API request and response contracts
+- OpenShell/OCSF normalization
+- Projector boundary
+- Persistence boundary
+- Backward compatibility
+- Unknown event types
+- Unknown fields
+- Unsupported versions
+- Integrity-version semantics
+
+C. Component tests
+
+- Projector service
+- Checkpoint processing
+- Context retrieval
+- Admission policy
+- Identity propagation
+- Classification filters
+- Quarantine behavior
+
+D. Integration tests
+
+- Real PostgreSQL where PostgreSQL is the production store
+- Migrations
+- Duplicate delivery
+- Out-of-order delivery
+- Retry
+- Replay
+- Checkpoint recovery
+- Full rebuild
+- Transaction failure
+- Poison events
+- Dependency interruption
+
+E. BDD end-to-end tests
+
+Exercise the required business scenarios through supported external boundaries.
+
+F. Security and abuse tests
+
+- Cross-tenant access
+- Forged identity
+- Invalid integrity input
+- Invalid signatures where supported
+- Classification bypass
+- Purpose-policy bypass
+- Oversized events
+- Malformed events
+- Replay attacks
+- Enumeration
+- Prompt or payload injection
+- Fail-open behavior
+- Secret exposure
+- Privilege escalation
+
+G. Performance tests
+
+- Read throughput
+- Write throughput
+- Projection lag
+- Duplicate-event amplification
+- Backpressure
+- Rebuild duration
+- Concurrent tenant behavior
+- Storage growth
+- Soak behavior
+
+H. Resilience tests
+
+- Projector restart
+- Projection database interruption
+- Ledger interruption
+- Partial processing failure
+- Poison event
+- Checkpoint corruption
+- Backup
+- Restore
+- Full replay
+- Network interruption
+- Graceful degradation
+
+I. Deployment and lifecycle tests
+
+- OpenShift manifest validation
+- Arbitrary non-root UID
+- Restricted security context
+- NetworkPolicy
+- Secrets
+- Resource constraints
+- Health probes
+- Upgrade
+- Migration
+- Rollback
+- Image provenance
+
+J. Live integration tests
+
+- Use fixtures first
+- Run live OpenShell integration only when the environment is actually available
+- Preserve honest labeling of evidence
+- Never block local development on unavailable proprietary or external infrastructure
+- Never convert unavailable live evidence into GREEN
+
+===============================================================================
+20. RED/YELLOW/GREEN EVIDENCE MATRIX
+===============================================================================
+
+Create:
+
+- tests/shared-memory/EVIDENCE_MATRIX.md
+- tests/shared-memory/evidence-results.json
+- docs/production-readiness-rubric.md
+
+Each row must include:
+
+- ID
+- Layer or capability
+- Requirement
+- Falsifiable claim
+- Principal risk
+- Priority
+- Method: TDD, EDD, CDD, BDD, CBT, or combination
+- Test or evidence artifact
+- Environment
+- Status
+- Owner
+- Execution timestamp
+- Git SHA
+- Waiver information
+- Notes
+
+Status definitions:
+
+RED
+
+- Missing
+- Failing
+- Untested
+- Non-reproducible
+- Contradicted by evidence
+- Evidence belongs to a different implementation or commit
+
+YELLOW
+
+- Partially demonstrated
+- Fixture-tested only
+- Development-tested only
+- Missing production-like evidence
+- Missing scale or resilience validation
+- Missing required review
+- Implemented but not sufficiently evidenced
+
+YELLOW is not production-ready.
+
+GREEN
+
+- Requirement is satisfied
+- Automated evidence is reproducible
+- Required controls passed
+- Evidence is tied to the current commit and relevant environment
+- No contradictory evidence remains
+- Required review is complete
+
+If evidence becomes stale, unverifiable, or materially mismatched with the deployed configuration, return the row to RED or YELLOW.
+
+===============================================================================
+21. PRODUCTION-READINESS RUBRIC
+===============================================================================
+
+Score every category from 0 through 4:
+
+- 0: absent
+- 1: designed but not demonstrated
+- 2: demonstrated in development or fixtures
+- 3: demonstrated in a production-like environment
+- 4: reproducible, controlled, observed, documented, and operationally owned
+
+Apply these weights:
+
+- Correctness and deterministic projection: 15
+- Contracts and compatibility: 10
+- Security, identity, and authorization: 15
+- Tenant isolation, privacy, and data governance: 10
+- Resilience, replay, backup, and recovery: 10
+- Performance, scale, and backpressure: 10
+- Observability and operations: 10
+- OpenShift and OpenShell integration: 10
+- Supply-chain and evidence integrity: 5
+- Documentation, usability, and runbooks: 5
+
+Normalize the result to 100 points.
+
+Production requires:
+
+- At least 90/100
+- No critical RED rows
+- Every P0 and P1 requirement GREEN
+- No security or tenant-isolation category below GREEN
+- No expired waiver
+- Two consecutive successful production-candidate executions
+- Production-like OpenShift evidence
+- Contract-compatibility evidence
+- Representative load evidence
+- Soak evidence
+- Backup and restore evidence
+- Deterministic replay evidence
+- Upgrade and rollback evidence
+- Security and abuse-test evidence
+- Observability and alert validation
+- Independent human review
+- Explicit human promotion approval
+
+A high numerical score cannot override a veto condition.
+
+===============================================================================
+22. AUTOMATIC NO-GO CONDITIONS
+===============================================================================
+
+The result is automatically NO-GO if any of the following are true:
+
+- A normal context read requires a ledger call.
+- Cross-tenant data exposure is possible.
+- Authorization fails open.
+- Unverified input is presented as trusted evidence.
+- A checksum is represented as signer-bound verification.
+- Duplicate delivery changes effective state.
+- Replay produces a different projection.
+- Rebuild loses dissent, dispute, supersession, revocation, or provenance.
+- Routine OpenShell or OCSF telemetry floods the ledger.
+- Fixture evidence is labeled as live evidence.
+- Consequential actions lack actor or correlation provenance.
+- Required secrets appear in source, images, manifests, or logs.
+- Backup restoration has not been demonstrated.
+- Rollback has not been demonstrated.
+- Critical vulnerabilities remain without an approved, time-bounded exception.
+- A context bundle leaks unauthorized record existence.
+- Stale projection state is silently presented as current.
+- Observability cannot distinguish ledger, projection, policy, and dependency failures.
+- A required GREEN result cannot be reproduced.
+- Production qualification relies only on self-attestation.
+
+===============================================================================
+23. PROMOTION STAGES
+===============================================================================
+
+Stage 1 — Development
+
+Requires:
+
+- Unit tests
+- Schema tests
+- Contract tests
+- Fixtures
+- Deterministic reducers
+- Initial BDD scenarios
+
+Stage 2 — Integration
+
+Requires:
+
+- Real projection database
+- Migrations
+- Projector checkpointing
+- Duplicate handling
+- Out-of-order handling
+- Replay
+- Rebuild
+- Failure-boundary tests
+
+Stage 3 — OpenShift staging
+
+Requires:
+
+- Restricted deployment
+- Service identity
+- Tenant enforcement
+- NetworkPolicy
+- Resource controls
+- Observability
+- Fixture-based OpenShell integration
+- Upgrade
+- Rollback
+
+Stage 4 — Production candidate
+
+Requires:
+
+- Live integration where actually available
+- Representative security testing
+- Representative load
+- Soak testing
+- Failure injection
+- Backup restore
+- Disaster recovery
+- Two complete consecutive GREEN candidate runs
+
+Stage 5 — Production
+
+Requires:
+
+- Human promotion checkpoint
+- Signed or otherwise attributable evidence summary
+- Named operational owner
+- Residual-risk statement
+- Rollback authority
+- Explicit GO decision
+
+No lower stage may claim evidence belonging to a higher stage.
+
+For this initial OSS vertical slice, a truthful result will likely be NO-GO or CONDITIONAL until production-like OpenShift and live OpenShell evidence exists.
+
+That is acceptable. Do not manufacture a GO.
+
+===============================================================================
+24. WAIVERS
+===============================================================================
+
+A waiver does not convert RED into GREEN.
+
+Every waiver must contain:
+
+- Exact failed or missing requirement
+- Business justification
+- Risk severity
+- Named accountable owner
+- Compensating control
+- Scope
+- Creation date
+- Expiration date
+- Remediation issue
+- Explicit approval
+
+The following are not waivable for production:
+
+- Cross-tenant exposure
+- Authorization fail-open
+- Evidence-integrity misrepresentation
+- Non-deterministic replay
+- Unrecoverable projections
+- Missing backup restoration
+- Critical secret exposure
+- Unbounded routine telemetry ingestion
+
+===============================================================================
+25. IMPLEMENTATION ORDER
+===============================================================================
+
+Use this order unless repository evidence supports a better dependency sequence:
+
+1. Baseline repository and tests.
+2. Architecture decision and threat model.
+3. RED evidence matrix.
+4. MemoryEventV1 contract and failing contract tests.
+5. ContextBundleV1 contract and failing contract tests.
+6. Failing BDD scenarios for divergent memory and consequential execution.
+7. Deterministic projector reducer tests.
+8. Projection schema and migrations.
+9. Minimal projector implementation.
+10. Duplicate, ordering, replay, and rebuild tests.
+11. Consequential-event admission policy.
+12. OpenShell fixture adapter.
+13. Context API and authorization boundary.
+14. OpenShift deployment assets.
+15. Observability.
+16. Security and abuse tests.
+17. Performance and resilience harnesses.
+18. Runbooks.
+19. Evidence capture.
+20. Production-readiness scoring.
+21. Focused commits.
+22. Draft pull request.
+
+Prefer one complete vertical slice over many incomplete abstractions.
+
+A suitable demonstration slice is:
+
+    OpenShell action denied
+        → normalized source event
+        → consequential admission decision
+        → immutable MemoryEventV1 append
+        → idempotent projection
+        → authorized ContextBundleV1 retrieval
+        → visible denial, provenance, correlation, and trust state
+
+Also demonstrate:
+
+    Two differing human interpretations
+        → both recorded immutably
+        → dissent preserved
+        → decision references the interpretations
+        → projection exposes the effective decision without deleting disagreement
+
+===============================================================================
+26. VALIDATION
+===============================================================================
+
+Run all existing repository checks plus all new checks.
+
+At minimum validate:
+
+- Formatting
+- Static analysis
+- Type checking
+- Unit tests
+- Contract tests
+- Integration tests
+- BDD tests
+- Security tests
+- Dependency audit
+- Schema validation
+- Migration forward path
+- Migration rollback or documented safe rollback
+- Projection rebuild
+- Duplicate delivery
+- Out-of-order delivery
+- Authorization
+- Tenant isolation
+- OpenShell filtering
+- OpenShift manifest validation
+- Container non-root behavior
+- Evidence generation
+
+Record exact commands and results.
+
+If a required external environment is unavailable:
+
+- Do not fabricate the result.
+- Mark the affected row RED or YELLOW.
+- Use fixtures where useful.
+- State exactly what remains to be run.
+- Provide the command and expected environment for later validation.
+
+===============================================================================
+27. DOCUMENTATION LANGUAGE
+===============================================================================
+
+Use precise language.
+
+Say:
+
+- recorded evidence
+- asserted claim
+- integrity verified
+- source verified
+- disputed
+- effective decision
+- projected state
+- projection checkpoint
+- production candidate
+- fixture-tested
+
+Avoid unsupported claims such as:
+
+- guaranteed truth
+- tamper-proof
+- production-ready
+- Red Hat certified
+- OpenShell validated
+- cryptographically signed
+
+unless the evidence and implementation justify those exact statements.
+
+Explain projections in plain language:
+
+A projection is a rebuildable, read-optimized interpretation of immutable events. It lets agents retrieve current, relevant organizational context without repeatedly scanning or calling the immutable ledger. Different projections can serve different purposes while still pointing back to the same evidence.
+
+===============================================================================
+28. GIT AND PULL REQUEST
+===============================================================================
+
+Keep changes focused.
+
+Before committing:
+
+- Review the full diff.
+- Remove generated noise.
+- Confirm historical evidence was not damaged.
+- Confirm no secrets are included.
+- Run relevant tests.
+- Update evidence for the final commit.
+
+Use clear commits such as:
+
+- contracts: define shared-memory event and context schemas
+- projector: add deterministic enterprise-memory projections
+- openshell: add consequential-event admission adapter
+- api: expose authorized projected context bundles
+- deploy: add OpenShift-compatible runtime assets
+- test: add production qualification evidence and gates
+- docs: document shared-memory architecture and operations
+
+If GitHub authentication is available:
+
+1. Push the branch.
+2. Open a draft pull request.
+3. Use a title equivalent to:
+
+   feat: add shared enterprise memory projection foundation
+
+4. Include in the PR:
+   - Problem
+   - Architecture
+   - Scope
+   - Non-goals
+   - Security model
+   - OpenShell alignment
+   - OpenShift alignment
+   - Testing
+   - Evidence
+   - Production-readiness score
+   - RED and YELLOW gaps
+   - Rollout considerations
+   - Deferred work
+
+Do not mark the PR ready for merge if critical tests are failing or the implementation is internally inconsistent.
+
+A production NO-GO verdict does not necessarily prevent merging an honest, well-scoped OSS foundation. Clearly distinguish “safe to merge as an experimental foundation” from “approved for production deployment.”
+
+===============================================================================
+29. REQUIRED COMPLETION REPORT
+===============================================================================
+
+At completion, report:
+
+1. Baseline repository state
+2. Branch and commits
+3. What was implemented
+4. Architecture and major decisions
+5. Ledger versus projection boundaries
+6. Red → Green history for every vertical slice
+7. Tests written before implementation
+8. Contracts introduced or changed
+9. BDD scenarios and results
+10. Controls and capability tests
+11. OpenShell integration status
+12. OpenShift validation status
+13. Exact validation commands
+14. Evidence artifacts
+15. Performance results and test environment
+16. Evidence-matrix summary
+17. Weighted production-readiness score
+18. Every RED row
+19. Every YELLOW row
+20. Waivers and expiration dates
+21. Residual risks
+22. Deliberately deferred gaps
+23. Recommended next slice
+24. Pull request URL, if created
+25. Final verdict:
+    - NO-GO
+    - CONDITIONAL
+    - GO
+
+Do not issue GO merely because the implementation is functional.
+
+TDD proves the code.
+CDD proves the boundaries.
+BDD proves the behavior.
+CBT proves the capabilities and controls.
+EDD proves that the other proofs actually happened.
+
+Production is not a declaration. It is a state this implementation must earn.
