@@ -1,0 +1,29 @@
+{
+  "class_uid": 4001,
+  "class_name": "Network Activity",
+  "category_uid": 4,
+  "activity_id": 1,
+  "activity_name": "Open",
+  "severity_id": 1,
+  "severity": "Informational",
+  "status_id": 1,
+  "time": 1723334400000,
+  "disposition": "allowed",
+  "disposition_id": 1,
+  "metadata": {
+    "uid": "net-allowed-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "process": {
+      "pid": 1234,
+      "name": "curl",
+      "cmd_line": "curl https://api.internal/health"
+    }
+  },
+  "unmapped": {
+    "sandbox_id": "sb-routine-001",
+    "cluster": "dev-west",
+    "namespace": "agents"
+  }
+}

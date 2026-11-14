@@ -11,6 +11,10 @@ pub struct ProjectionConfig {
     pub projector_batch_size: i64,
     pub metrics_port: u16,
     pub auth_tenant_config: Option<HashMap<String, Vec<String>>>,
+    pub ocsf_enabled: bool,
+    pub ocsf_tenant_id: String,
+    pub ocsf_is_fixture: bool,
+    pub ocsf_admission_policy_json: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -45,6 +49,11 @@ impl ProjectionConfig {
             projector_batch_size: parse_u64("PROJECTION_PROJECTOR_BATCH_SIZE", 100)? as i64,
             metrics_port: parse_u16("PROJECTION_METRICS_PORT", 8085)?,
             auth_tenant_config,
+            ocsf_enabled: parse_bool("PROJECTION_OCSF_ENABLED", false),
+            ocsf_tenant_id: env::var("PROJECTION_OCSF_TENANT_ID")
+                .unwrap_or_else(|_| "openshell".to_string()),
+            ocsf_is_fixture: parse_bool("PROJECTION_OCSF_IS_FIXTURE", true),
+            ocsf_admission_policy_json: env::var("PROJECTION_OCSF_ADMISSION_POLICY").ok(),
         })
     }
 }
@@ -59,6 +68,13 @@ fn parse_u16(name: &str, default: u16) -> Result<u16, ConfigError> {
             .parse::<u16>()
             .map_err(|_| ConfigError::Invalid(name.to_string(), "not a valid u16".to_string())),
         Err(_) => Ok(default),
+    }
+}
+
+fn parse_bool(name: &str, default: bool) -> bool {
+    match env::var(name) {
+        Ok(raw) => matches!(raw.to_lowercase().as_str(), "true" | "1" | "yes"),
+        Err(_) => default,
     }
 }
 

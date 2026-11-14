@@ -6,4 +6,5 @@ pub mod context;
 pub mod contract;
 pub mod ledger;
 pub mod metrics;
+pub mod ocsf;
 pub mod projection;

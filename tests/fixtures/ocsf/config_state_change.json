@@ -1,0 +1,32 @@
+{
+  "class_uid": 5001,
+  "class_name": "Config State Change",
+  "category_uid": 5,
+  "activity_id": 2,
+  "activity_name": "Update",
+  "severity_id": 3,
+  "severity": "High",
+  "status_id": 1,
+  "time": 1723335000000,
+  "metadata": {
+    "uid": "config-change-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "user": {
+      "uid": "admin-001",
+      "name": "platform-admin"
+    }
+  },
+  "policy": {
+    "uid": "pol-global-001",
+    "name": "global-sandbox-policy",
+    "version": "7"
+  },
+  "unmapped": {
+    "sandbox_id": "sb-config-001",
+    "cluster": "prod-east",
+    "namespace": "system",
+    "policy_hash": "sha256:newpolicyhash"
+  }
+}

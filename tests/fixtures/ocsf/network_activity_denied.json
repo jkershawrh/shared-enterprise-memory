@@ -1,0 +1,38 @@
+{
+  "class_uid": 4001,
+  "class_name": "Network Activity",
+  "category_uid": 4,
+  "activity_id": 1,
+  "activity_name": "Open",
+  "severity_id": 3,
+  "severity": "High",
+  "status_id": 2,
+  "time": 1723334500000,
+  "disposition": "denied",
+  "disposition_id": 2,
+  "metadata": {
+    "uid": "net-denied-001",
+    "correlation_uid": "trace-net-denied",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "process": {
+      "pid": 5678,
+      "name": "python3",
+      "cmd_line": "python3 exfiltrate.py"
+    }
+  },
+  "policy": {
+    "uid": "pol-network-001",
+    "name": "sandbox-egress-policy",
+    "version": "12"
+  },
+  "unmapped": {
+    "sandbox_id": "sb-suspect-002",
+    "cluster": "prod-east",
+    "namespace": "agents",
+    "policy_hash": "sha256:aabbccdd",
+    "request_id": "req-net-denied-001",
+    "trace_id": "trace-net-denied-fallback"
+  }
+}

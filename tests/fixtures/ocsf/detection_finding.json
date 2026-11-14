@@ -1,0 +1,30 @@
+{
+  "class_uid": 2004,
+  "class_name": "Detection Finding",
+  "category_uid": 2,
+  "activity_id": 1,
+  "activity_name": "Create",
+  "severity_id": 1,
+  "severity": "Informational",
+  "status_id": 1,
+  "time": 1723334900000,
+  "metadata": {
+    "uid": "finding-001",
+    "correlation_uid": "corr-finding-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "process": {
+      "pid": 555,
+      "name": "security-scanner"
+    }
+  },
+  "observables": [
+    { "name": "file_hash", "type_id": 7, "value": "sha256:suspicious" }
+  ],
+  "unmapped": {
+    "sandbox_id": "sb-scan-001",
+    "cluster": "prod-east",
+    "namespace": "security"
+  }
+}

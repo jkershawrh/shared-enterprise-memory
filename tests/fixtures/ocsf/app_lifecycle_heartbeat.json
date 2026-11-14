@@ -1,0 +1,18 @@
+{
+  "class_uid": 6002,
+  "class_name": "App Lifecycle",
+  "category_uid": 6,
+  "activity_id": 3,
+  "activity_name": "heartbeat",
+  "severity_id": 0,
+  "severity": "Unknown",
+  "status_id": 1,
+  "time": 1723335100000,
+  "metadata": {
+    "uid": "heartbeat-001",
+    "version": "1.7.0"
+  },
+  "unmapped": {
+    "sandbox_id": "sb-hb-001"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "class_uid": 4002,
+  "class_name": "HTTP Activity",
+  "category_uid": 4,
+  "activity_id": 1,
+  "activity_name": "Connect",
+  "severity_id": 1,
+  "severity": "Informational",
+  "status_id": 1,
+  "time": 1723334600000,
+  "disposition": "allowed",
+  "disposition_id": 1,
+  "metadata": {
+    "uid": "http-routine-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "process": {
+      "pid": 900,
+      "name": "httpd"
+    }
+  },
+  "unmapped": {
+    "sandbox_id": "sb-web-001"
+  }
+}

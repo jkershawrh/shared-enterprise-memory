@@ -79,6 +79,6 @@ All rows start RED. Status progresses to YELLOW (fixture-tested) or GREEN (repro
 
 | ID | Requirement | Falsifiable Claim | Method | Status | Artifact |
 |----|------------|-------------------|--------|--------|----------|
-| OS-01 | OCSF adapter | Consequential events admitted, routine excluded | CBT | RED | Deferred |
-| OS-02 | Correlation fields | OpenShell correlation preserved through projection | CDD | RED | Deferred |
-| OS-03 | Fixture vs live labeling | Fixture evidence clearly labeled | EDD | RED | Deferred |
+| OS-01 | OCSF adapter | Consequential events admitted, routine excluded | CBT | YELLOW | tests/ocsf_admission.rs: routine_events_are_dropped, consequential_denials_are_promoted, detection_finding_always_promoted |
+| OS-02 | Correlation fields | OpenShell correlation preserved through projection | CDD | YELLOW | tests/ocsf_admission.rs: correlation_fields_preserved, policy_revision_visible_in_projection |
+| OS-03 | Fixture vs live labeling | Fixture evidence clearly labeled | EDD | YELLOW | tests/ocsf_admission.rs: fixture_vs_live_labeling |

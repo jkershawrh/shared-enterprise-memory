@@ -44,6 +44,30 @@ lazy_static! {
         "Duration of context API requests"
     ))
     .unwrap();
+    pub static ref OCSF_EVENTS_RECEIVED: CounterVec = CounterVec::new(
+        Opts::new(
+            "ocsf_events_received_total",
+            "Total OCSF events received by class"
+        ),
+        &["class"]
+    )
+    .unwrap();
+    pub static ref OCSF_EVENTS_PROMOTED: CounterVec = CounterVec::new(
+        Opts::new(
+            "ocsf_events_promoted_total",
+            "Total OCSF events promoted to memory by class"
+        ),
+        &["class"]
+    )
+    .unwrap();
+    pub static ref OCSF_EVENTS_DROPPED: CounterVec = CounterVec::new(
+        Opts::new(
+            "ocsf_events_dropped_total",
+            "Total OCSF events dropped by admission policy by class"
+        ),
+        &["class"]
+    )
+    .unwrap();
 }
 
 pub fn register_metrics() {
@@ -64,6 +88,15 @@ pub fn register_metrics() {
         .ok();
     REGISTRY
         .register(Box::new(CONTEXT_API_DURATION.clone()))
+        .ok();
+    REGISTRY
+        .register(Box::new(OCSF_EVENTS_RECEIVED.clone()))
+        .ok();
+    REGISTRY
+        .register(Box::new(OCSF_EVENTS_PROMOTED.clone()))
+        .ok();
+    REGISTRY
+        .register(Box::new(OCSF_EVENTS_DROPPED.clone()))
         .ok();
 }
 

@@ -1,0 +1,58 @@
+{
+  "class_uid": 4001,
+  "class_name": "Network Activity",
+  "category_uid": 4,
+  "activity_id": 5,
+  "activity_name": "Refuse",
+  "severity_id": 4,
+  "severity": "Critical",
+  "status_id": 2,
+  "time": 1723335200000,
+  "disposition": "denied",
+  "disposition_id": 2,
+  "metadata": {
+    "uid": "denial-full-corr-001",
+    "correlation_uid": "corr-meta-001",
+    "version": "1.7.0",
+    "product": {
+      "name": "OpenShell",
+      "vendor_name": "NVIDIA",
+      "version": "1.2.0"
+    }
+  },
+  "actor": {
+    "user": {
+      "uid": "agent-500",
+      "name": "ml-pipeline-agent"
+    },
+    "process": {
+      "pid": 9999,
+      "name": "python3",
+      "cmd_line": "python3 train.py --gpu",
+      "uid": "proc-9999"
+    },
+    "session": {
+      "uid": "sess-abc-123",
+      "issuer": "keycloak"
+    }
+  },
+  "policy": {
+    "uid": "pol-egress-strict",
+    "name": "strict-egress-v2",
+    "version": "42"
+  },
+  "observables": [
+    { "name": "dst_ip", "type_id": 2, "value": "10.0.0.99" },
+    { "name": "dst_port", "type_id": 10, "value": "443" }
+  ],
+  "unmapped": {
+    "sandbox_id": "sb-ml-pipeline-007",
+    "cluster": "prod-east-gpu",
+    "namespace": "ml-training",
+    "policy_hash": "sha256:42deadbeef42",
+    "request_id": "req-full-corr-001",
+    "trace_id": "trace-full-corr-001",
+    "traceparent": "00-abcdef1234567890-span123-01",
+    "correlation_id": "corr-unmapped-001"
+  }
+}

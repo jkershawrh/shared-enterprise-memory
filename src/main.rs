@@ -17,6 +17,9 @@ use projections::context::api::context_api_router;
 use projections::context::ContextService;
 use projections::ledger::postgres::PostgresLedgerReader;
 use projections::metrics;
+use projections::ocsf::adapter::{OcsfAdapter, OcsfAdapterConfig};
+use projections::ocsf::admission::AdmissionPolicy;
+use projections::ocsf::api::ocsf_api_router;
 use projections::projection::postgres::PostgresProjectionRepository;
 use projections::projection::Projector;
 
@@ -79,7 +82,23 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let api_addr = SocketAddr::from(([0, 0, 0, 0], config.context_api_port));
-    let api_app = context_api_router(context_service);
+    let mut api_app = context_api_router(context_service.clone());
+
+    if config.ocsf_enabled {
+        let admission_policy = match &config.ocsf_admission_policy_json {
+            Some(json) => AdmissionPolicy::from_json(json)
+                .context("parsing PROJECTION_OCSF_ADMISSION_POLICY")?,
+            None => AdmissionPolicy::default(),
+        };
+        let adapter_config = OcsfAdapterConfig {
+            tenant_id: config.ocsf_tenant_id.clone(),
+            source_label: "openshell-supervisor".to_string(),
+            is_fixture: config.ocsf_is_fixture,
+        };
+        let adapter = Arc::new(OcsfAdapter::new(admission_policy, adapter_config));
+        api_app = api_app.merge(ocsf_api_router(adapter, context_service));
+        info!("OCSF adapter enabled, tenant={}", config.ocsf_tenant_id);
+    }
     let api_listener = TcpListener::bind(api_addr)
         .await
         .context("failed to bind context API listener")?;

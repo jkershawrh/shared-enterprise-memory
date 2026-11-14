@@ -1,0 +1,24 @@
+{
+  "class_uid": 1007,
+  "class_name": "Process Activity",
+  "category_uid": 1,
+  "activity_id": 1,
+  "activity_name": "Launch",
+  "severity_id": 1,
+  "severity": "Informational",
+  "status_id": 1,
+  "time": 1723334800000,
+  "metadata": {
+    "uid": "proc-start-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "process": {
+      "pid": 1,
+      "name": "systemd"
+    }
+  },
+  "unmapped": {
+    "sandbox_id": "sb-proc-001"
+  }
+}

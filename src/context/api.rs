@@ -33,7 +33,7 @@ pub fn context_api_router<P: ProjectionRepository + 'static, A: AuthorizationPro
         .with_state(service)
 }
 
-fn extract_agent_id(headers: &HeaderMap) -> Result<String, (StatusCode, String)> {
+pub(crate) fn extract_agent_id(headers: &HeaderMap) -> Result<String, (StatusCode, String)> {
     headers
         .get("x-agent-id")
         .and_then(|v| v.to_str().ok())

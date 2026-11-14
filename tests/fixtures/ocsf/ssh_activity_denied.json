@@ -1,0 +1,37 @@
+{
+  "class_uid": 4003,
+  "class_name": "SSH Activity",
+  "category_uid": 4,
+  "activity_id": 1,
+  "activity_name": "Open",
+  "severity_id": 4,
+  "severity": "Critical",
+  "status_id": 2,
+  "time": 1723334700000,
+  "disposition": "blocked",
+  "disposition_id": 3,
+  "metadata": {
+    "uid": "ssh-denied-001",
+    "version": "1.7.0"
+  },
+  "actor": {
+    "user": {
+      "uid": "1000",
+      "name": "rogue-agent"
+    },
+    "process": {
+      "pid": 3456,
+      "name": "ssh"
+    }
+  },
+  "policy": {
+    "uid": "pol-ssh-001",
+    "name": "sandbox-ssh-policy",
+    "version": "3"
+  },
+  "unmapped": {
+    "sandbox_id": "sb-ssh-attempt",
+    "cluster": "prod-east",
+    "namespace": "restricted"
+  }
+}
